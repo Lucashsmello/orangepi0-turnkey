@@ -25,10 +25,10 @@
         {% if message %}<p>{{ message|safe }}</p>{% endif %}
       </div>
 
-      <div class="form-label-group">
+      <!--div class="form-label-group">
         <input type="email" name="email" id="inputEmail" class="form-control" placeholder="Email address" required autofocus>
         <label for="inputEmail">Email address</label>
-      </div>
+      </div-->
 
       <div class="form-group">
         <label for="inputSSID">SSID</label>
@@ -37,6 +37,7 @@
           <option>{{ s }}</option>
           {% endfor %}
         </select>
+        <input type="button" value="Scan" onclick="mypost('/scan')"/>
       </div>
 
       <div class="form-label-group">
@@ -45,6 +46,43 @@
       </div>
 
       <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
-      <p class="mt-5 mb-3 text-muted text-center"><a href="https://github.com/schollz/raspberry-pi-turnkey">Raspberry Pi Turnkey</a></p>
     </form>
+      <p class="mt-5 mb-3 text-muted text-center"><a href="https://github.com/Lucashsmello/orangepi0-turnkey">Orange Pi Zero Turnkey</a></p>
+      <p class="mt-5 mb-3 text-muted text-center"><a href="https://github.com/schollz/raspberry-pi-turnkey">Raspberry Pi Turnkey</a></p>
   </body>
+
+<script>
+/**
+ * sends a request to the specified url from a form. this will change the window location.
+ * @param {string} path the path to send the post request to
+ * @param {object} params the paramiters to add to the url
+ * @param {string} [method=post] the method to use on the form
+ */
+function mypost(path, params, method) {
+    if(confirm('This will may turn off hotspot for a few seconds.\nIf so, you should reconnect manually after 5 seconds.')==false){
+        return;
+    }
+    method = method || "post"; // Set method to post by default if not specified.
+
+    // The rest of this code assumes you are not using a library.
+    // It can be made less wordy if you use one.
+    var form = document.createElement("form");
+    form.setAttribute("method", method);
+    form.setAttribute("action", path);
+
+    for(var key in params) {
+        if(params.hasOwnProperty(key)) {
+            var hiddenField = document.createElement("input");
+            hiddenField.setAttribute("type", "hidden");
+            hiddenField.setAttribute("name", key);
+            hiddenField.setAttribute("value", params[key]);
+
+            form.appendChild(hiddenField);
+        }
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+

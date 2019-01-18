@@ -15,13 +15,15 @@ app = Flask(__name__, static_url_path='')
 currentdir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(currentdir)
 
-ssid_list = []
-def getssid():
-    global ssid_list
-    if len(ssid_list) > 0:
-        return ssid_list
+
+def scanSSIDs():
     ssid_list = []
-    get_ssid_list = subprocess.check_output(('iw', 'dev', 'wlan0', 'scan', 'ap-force'))
+    try:
+        get_ssid_list = subprocess.check_output(('iw', 'dev', 'wlan0', 'scan', 'ap-force'))
+    except Exception as ex:
+        print("Could not scan for ssid")
+        return None
+		
     ssids = get_ssid_list.splitlines()
     for s in ssids:
         s = s.strip().decode('utf-8')
@@ -34,6 +36,16 @@ def getssid():
     print(ssid_list)
     ssid_list = sorted(list(set(ssid_list)))
     return ssid_list
+
+SSID_LIST = []
+def getssid():
+    global SSID_LIST
+    if len(SSID_LIST) <= 0:
+        l=scanSSIDs()
+        if(not(l is None)):
+            SSID_LIST=l
+    return SSID_LIST
+
 
 def id_generator(size=6, chars=string.ascii_lowercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -142,7 +154,7 @@ def send_static(path):
 
 @app.route('/signin', methods=['POST'])
 def signin():
-    email = request.form['email']
+    #email = request.form['email']
     ssid = request.form['ssid']
     password = request.form['password']
 
@@ -150,16 +162,14 @@ def signin():
     if password == "":
         pwd = "key_mgmt=NONE" # If open AP
 
-    print(email, ssid, password)
+    print(ssid, password)
     valid_psk = check_cred(ssid, password)
     if not valid_psk:
         # User will not see this because they will be disconnected but we need to break here anyway
         return render_template('ap.html', message="Wrong password!")
 
-    with open('wpa.conf', 'w') as f:
-        f.write(wpa_conf % (ssid, pwd))
-    with open('status.json', 'w') as f:
-        f.write(json.dumps({'status':'disconnected'}))
+    writeWPAconf(wpa_conf % (ssid, pwd))
+    writeStatus({'status':'disconnected'})
     subprocess.Popen(["./disable_ap.sh"])
     piid = open('pi.id', 'r').read().strip()
     return render_template('index.html', message="Please wait 2 minutes to connect. Then your IP address will show up at <a href='https://snaptext.live/{}'>snaptext.live/{}</a>.".format(piid,piid))
@@ -172,21 +182,36 @@ def wificonnected():
         return True
     return False
 
+@app.route('/scan', methods=['POST'])
+def route_scan():
+    global SSID_LIST
+    r=subprocess.call("./stopAP.sh")
+    SSID_LIST=scanSSIDs()
+    r=subprocess.call("./startAP.sh")
+    return render_template('index.html', message="hello")
+
+def writeWPAconf(conf):
+    with open('wpa.conf', 'w') as f:
+        f.write(conf)
+
+def writeStatus(s):
+    with open('status.json', 'w') as f:
+        f.write(json.dumps(s))    
+
 if __name__ == "__main__":
     # things to run the first time it boots
     if not os.path.isfile('pi.id'):
         with open('pi.id', 'w') as f:
             f.write(id_generator())
-        subprocess.Popen("./expand_filesystem.sh")
-        time.sleep(300)
+        #subprocess.Popen("./expand_filesystem.sh")
+        #time.sleep(300)
     piid = open('pi.id', 'r').read().strip()
     print(piid)
-    time.sleep(15)
+    time.sleep(1)
     # get status
     s = {'status':'disconnected'}
     if not os.path.isfile('status.json'):
-        with open('status.json', 'w') as f:
-            f.write(json.dumps(s))
+        writeStatus(s)
     else:
         s = json.load(open('status.json'))
 
@@ -197,14 +222,11 @@ if __name__ == "__main__":
         if s['status'] == 'connected': # Don't change if status in status.json is hostapd
             s['status'] = 'disconnected'
 
-    with open('status.json', 'w') as f:
-        f.write(json.dumps(s))
+    writeStatus(s)
     if s['status'] == 'disconnected':
         s['status'] = 'hostapd'
-        with open('status.json', 'w') as f:
-            f.write(json.dumps(s))
-        with open('wpa.conf', 'w') as f:
-            f.write(wpa_conf_default)
+        writeStatus(s)
+        writeWPAconf(wpa_conf_default)
         subprocess.Popen("./enable_ap.sh")
     elif s['status'] == 'connected':
         piid = open('pi.id', 'r').read().strip()
@@ -216,7 +238,7 @@ if __name__ == "__main__":
         s.close()
 
         # alert user on snaptext
-        r = requests.post("https://snaptext.live",data=json.dumps({"message":"Your Pi is online at {}".format(ipaddress),"to":piid,"from":"Raspberry Pi Turnkey"}))
+        r = requests.post("https://snaptext.live",data=json.dumps({"message":"Your Pi is online at {}".format(ipaddress),"to":piid,"from":"Pi Turnkey"}))
         print(r.json())
         subprocess.Popen("./startup.sh")
         while True:

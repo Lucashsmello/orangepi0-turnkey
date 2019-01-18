@@ -1,13 +1,18 @@
 #!/bin/bash
 
-sleep 3
+systemctl stop hostapd
+systemctl stop dhcpcd
+systemctl stop dnsmasq
 
 # enable the AP
 sudo cp config/hostapd /etc/default/hostapd
 sudo cp config/dhcpcd.conf /etc/dhcpcd.conf
 sudo cp config/dnsmasq.conf /etc/dnsmasq.conf
 
-# load wan configuration
+# load wlan configuration
 sudo cp wpa.conf /etc/wpa_supplicant/wpa_supplicant.conf
 
-sudo reboot now
+systemctl daemon-reload
+./startAP.sh
+
+#sudo reboot now

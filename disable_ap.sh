@@ -1,6 +1,8 @@
 #!/bin/bash
 
-sleep 3
+systemctl stop hostapd
+systemctl stop dhcpcd
+systemctl stop dnsmasq
 
 # disable the AP
 sudo cp config/hostapd.disabled /etc/default/hostapd
@@ -10,4 +12,5 @@ sudo cp config/dnsmasq.conf.disabled /etc/dnsmasq.conf
 # load wlan configuration
 sudo cp wpa.conf /etc/wpa_supplicant/wpa_supplicant.conf
 
-sudo reboot now
+systemctl daemon-reload
+#sudo reboot now
