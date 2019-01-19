@@ -66,8 +66,8 @@ update_config=1
 
 
 @app.route('/')
-def main():
-    piid = open('pi.id', 'r').read().strip()
+def Index():
+    piid = getPIID()
     return render_template('index.html', ssids=getssid(), message="Once connected you'll find IP address @ <a href='https://snaptext.live/{}' target='_blank'>snaptext.live/{}</a>.".format(piid,piid))
 
 # Captive portal when connected with iOS or Android
@@ -171,7 +171,7 @@ def signin():
     writeWPAconf(wpa_conf % (ssid, pwd))
     writeStatus({'status':'disconnected'})
     subprocess.Popen(["./disable_ap.sh"])
-    piid = open('pi.id', 'r').read().strip()
+    piid = getPIID()
     return render_template('index.html', message="Please wait 2 minutes to connect. Then your IP address will show up at <a href='https://snaptext.live/{}'>snaptext.live/{}</a>.".format(piid,piid))
 
 def wificonnected():
@@ -198,16 +198,24 @@ def writeStatus(s):
     with open('status.json', 'w') as f:
         f.write(json.dumps(s))    
 
+PIID=None
+def getPIID():
+    global PIID
+    if(PIID is None):
+        if os.path.isfile('pi.id'):
+            with open('pi.id', 'r') as f:
+                PIID=f.read().strip()
+        else:
+            with open('pi.id', 'w') as f:
+                PIID=id_generator()
+                f.write(PIID)
+    return PIID
+
 if __name__ == "__main__":
-    # things to run the first time it boots
-    if not os.path.isfile('pi.id'):
-        with open('pi.id', 'w') as f:
-            f.write(id_generator())
+    piid=getPIID()
         #subprocess.Popen("./expand_filesystem.sh")
         #time.sleep(300)
-    piid = open('pi.id', 'r').read().strip()
     print(piid)
-    time.sleep(1)
     # get status
     s = {'status':'disconnected'}
     if not os.path.isfile('status.json'):
@@ -227,10 +235,8 @@ if __name__ == "__main__":
         s['status'] = 'hostapd'
         writeStatus(s)
         writeWPAconf(wpa_conf_default)
-        subprocess.Popen("./enable_ap.sh")
+        subprocess.call("./enable_ap.sh")
     elif s['status'] == 'connected':
-        piid = open('pi.id', 'r').read().strip()
-
         # get ip address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
