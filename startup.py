@@ -166,7 +166,7 @@ def signin():
     valid_psk = check_cred(ssid, password)
     if not valid_psk:
         # User will not see this because they will be disconnected but we need to break here anyway
-        return render_template('ap.html', message="Wrong password!")
+        return render_template('index.html', message="Wrong password!")
 
     writeWPAconf(wpa_conf % (ssid, pwd))
     writeStatus({'status':'disconnected'})
@@ -211,7 +211,7 @@ def getPIID():
                 f.write(PIID)
     return PIID
 
-if __name__ == "__main__":
+def main():
     piid=getPIID()
         #subprocess.Popen("./expand_filesystem.sh")
         #time.sleep(300)
@@ -230,13 +230,15 @@ if __name__ == "__main__":
         if s['status'] == 'connected': # Don't change if status in status.json is hostapd
             s['status'] = 'disconnected'
 
-    writeStatus(s)
     if s['status'] == 'disconnected':
         s['status'] = 'hostapd'
         writeStatus(s)
         writeWPAconf(wpa_conf_default)
+        print("Enabling AP hotspot...")
         subprocess.call("./enable_ap.sh")
+        app.run(host="0.0.0.0", port=80, threaded=True)
     elif s['status'] == 'connected':
+        writeStatus(s)
         # get ip address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -246,8 +248,9 @@ if __name__ == "__main__":
         # alert user on snaptext
         r = requests.post("https://snaptext.live",data=json.dumps({"message":"Your Pi is online at {}".format(ipaddress),"to":piid,"from":"Pi Turnkey"}))
         print(r.json())
-        subprocess.Popen("./startup.sh")
-        while True:
-            time.sleep(60000)
+        subprocess.call("./startup.sh")
     else:
         app.run(host="0.0.0.0", port=80, threaded=True)
+
+if __name__ == "__main__":
+    main()
