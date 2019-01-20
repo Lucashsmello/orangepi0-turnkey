@@ -15,6 +15,20 @@ app = Flask(__name__, static_url_path='')
 currentdir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(currentdir)
 
+def stopAP(): #hotspot
+    print(subprocess.check_output(['systemctl', "stop", "hostapd", "dnsmasq", "dhcpcd"]))
+
+def startAP(): #hotspot
+    print(subprocess.check_output(['systemctl', "restart", "dnsmasq", "dhcpcd"]))
+    time.sleep(1)
+    print(subprocess.check_output(['systemctl', "restart", "hostapd"]))
+
+def getIPAddress():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    ipaddress = s.getsockname()[0]
+    s.close()
+    return ipaddress
 
 def scanSSIDs():
     ssid_list = []
@@ -103,20 +117,11 @@ def check_cred(ssid, password):
     with open(testconf, 'w') as f:
         f.write(result.decode('utf-8'))
 
-    def stop_ap(stop):
-        if stop:
-            # Services need to be stopped to free up wlan0 interface
-            print(subprocess.check_output(['systemctl', "stop", "hostapd", "dnsmasq", "dhcpcd"]))
-        else:
-            print(subprocess.check_output(['systemctl', "restart", "dnsmasq", "dhcpcd"]))
-            time.sleep(15)
-            print(subprocess.check_output(['systemctl', "restart", "hostapd"]))
-
     # Sentences to check for
     fail = "pre-shared key may be incorrect"
     success = "WPA: Key negotiation completed"
 
-    stop_ap(True)
+    stopAP()
 
     result = subprocess.check_output(['wpa_supplicant',
                                       "-Dnl80211",
@@ -145,7 +150,6 @@ def check_cred(ssid, password):
         pid = int(pid.strip())
         os.kill(pid, signal.SIGTERM)
 
-    stop_ap(False) # Restart services
     return valid_psk
 
 @app.route('/static/<path:path>')
@@ -163,14 +167,19 @@ def signin():
         pwd = "key_mgmt=NONE" # If open AP
 
     print(ssid, password)
-    valid_psk = check_cred(ssid, password)
+    valid_psk = check_cred(ssid, password) # this will interrupt AP.
     if not valid_psk:
+        startAP() # Restart services
         # User will not see this because they will be disconnected but we need to break here anyway
         return render_template('index.html', message="Wrong password!")
 
     writeWPAconf(wpa_conf % (ssid, pwd))
+    print("Disabling AP hotspot...")
+    print(subprocess.check_output(["./disable_ap.sh"]))
+    print("AP hostspot disabled.")
     writeStatus({'status':'disconnected'})
-    subprocess.Popen(["./disable_ap.sh"])
+    startup()
+        
     piid = getPIID()
     return render_template('index.html', message="Please wait 2 minutes to connect. Then your IP address will show up at <a href='https://snaptext.live/{}'>snaptext.live/{}</a>.".format(piid,piid))
 
@@ -185,9 +194,11 @@ def wificonnected():
 @app.route('/scan', methods=['POST'])
 def route_scan():
     global SSID_LIST
-    r=subprocess.call("./stopAP.sh")
-    SSID_LIST=scanSSIDs()
-    r=subprocess.call("./startAP.sh")
+    stopAP()
+    time.sleep(2)
+    SSID_LIST=[]
+    getssid()
+    startAP()
     return render_template('index.html', message="hello")
 
 def writeWPAconf(conf):
@@ -211,45 +222,48 @@ def getPIID():
                 f.write(PIID)
     return PIID
 
-def main():
-    piid=getPIID()
-        #subprocess.Popen("./expand_filesystem.sh")
-        #time.sleep(300)
-    print(piid)
-    # get status
+def getCurrentStatus():
     s = {'status':'disconnected'}
     if not os.path.isfile('status.json'):
         writeStatus(s)
     else:
         s = json.load(open('status.json'))
+    return s
+
+def startup():
+    s=getCurrentStatus()
 
     # check connection
     if wificonnected():
         s['status'] = 'connected'
-    if not wificonnected():
-        if s['status'] == 'connected': # Don't change if status in status.json is hostapd
+    else:
+        if s['status'] == 'connected' or s['status']=='hostapd':
             s['status'] = 'disconnected'
 
+    writeStatus(s)
     if s['status'] == 'disconnected':
-        s['status'] = 'hostapd'
-        writeStatus(s)
         writeWPAconf(wpa_conf_default)
         print("Enabling AP hotspot...")
         subprocess.call("./enable_ap.sh")
-        app.run(host="0.0.0.0", port=80, threaded=True)
-    elif s['status'] == 'connected':
+        s['status'] = 'hostapd'
         writeStatus(s)
-        # get ip address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ipaddress = s.getsockname()[0]
-        s.close()
-
+    elif s['status'] == 'connected':
+        ipaddress=getIPAddress()
         # alert user on snaptext
-        r = requests.post("https://snaptext.live",data=json.dumps({"message":"Your Pi is online at {}".format(ipaddress),"to":piid,"from":"Pi Turnkey"}))
+        r = requests.post("https://snaptext.live",data=json.dumps({"message":"Your Pi is online at {}".format(ipaddress),"to":getPIID(),"from":"Pi Turnkey"}))
         print(r.json())
         subprocess.call("./startup.sh")
-    else:
+
+    print("Current status: %s" % s['status'])
+    return s['status']
+
+def main():
+    piid=getPIID()
+        #subprocess.Popen("./expand_filesystem.sh")
+        #time.sleep(300)
+    print(piid)
+    status=startup()
+    if status=='disconnected' or status=='hostapd':
         app.run(host="0.0.0.0", port=80, threaded=True)
 
 if __name__ == "__main__":
