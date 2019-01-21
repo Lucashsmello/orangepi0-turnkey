@@ -1,18 +1,14 @@
 #!/bin/bash
 
-printf "disable_ap.sh: stopping services...\n"
-systemctl stop hostapd dnsmasq dhcpcd
+systemctl stop hostapd dhcpcd dnsmasq
+#systemctl stop NetworkManager
 
-printf "disable_ap.sh: loading disabled configuration files\n"
-# disable the AP
-sudo cp config/hostapd.disabled /etc/default/hostapd
-sudo cp config/dhcpcd.conf.disabled /etc/dhcpcd.conf
-sudo cp config/dnsmasq.conf.disabled /etc/dnsmasq.conf
+# enable the AP
+sudo cp config/hostapd /etc/default/hostapd
+sudo cp config/dhcpcd.conf /etc/dhcpcd.conf
+sudo cp config/dnsmasq.conf /etc/dnsmasq.conf
 
-printf "disable_ap.sh: loading wpa configuration\n"
-# load wlan configuration
-sudo cp wpa.conf /etc/wpa_supplicant/wpa_supplicant.conf
-
-sleep 1
-#systemctl daemon-reload
-#sudo
+nmcli radio wifi on
+sleep 2
+systemctl restart NetworkManager
+sleep 2
