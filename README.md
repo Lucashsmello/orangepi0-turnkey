@@ -27,7 +27,7 @@ Scanning SSID: `nmcli -f SSID device wifi list` after `nmcli radio wifi on` or `
 
 The following are the step-by-step instructions for how I create the turnkey image.
 
-## 1. Flash Raspbian Stretch Lite
+## 1. Flash ARMBIAN Bionic
 Use ARMBIAN Bionic (https://www.armbian.com/orange-pi-zero/).
 
 ## 2. Install libraries onto the Orange Pi Zero
