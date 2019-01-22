@@ -4,15 +4,15 @@ Have you ever wanted to setup a Orange Pi Zero *without having to SSH or attach 
 
 # Usage 
 
-Once you boot the Pi, wait about 1 minute to start up the web server. Then you will see a WiFi AP named "ConnectToConnect" (password same). Connect to it and your browser should automatically redirect you to a sign-in page. If not, navigate to `192.168.4.1` where you'll see a login form. 
+Once you boot the Pi, wait about 1 minute to start up the web server. Then you will see a WiFi AP (default name and password is "ConnectToConnect"). Connect to it and your browser should automatically redirect you to a sign-in page. If not, navigate to `192.168.4.1` where you'll see a login form. 
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/6550035/36927004-9dd66774-1e2f-11e8-941a-aa192005b2d6.png"/>
+  <img src="https://user-images.githubusercontent.com/18314140/51539242-a8c61100-1e3a-11e9-8036-0d4b65db6d61.png" width="450" height="686"/>
 </p>
 
 When the WiFi credentials are entered onto the login form, the Pi will modify its internal NetworkManager configuration to conform to them so that it will be connected to the net. The Pi will then reboot itself using those WiFi credentials. If the credentials are not correct, then the Pi will reboot back into the AP mode to allow you to re-enter them again.
 
-Once connected, you can recieve a message with the LAN IP for your Pi at https://snaptext.live (the specific URL will be given to you when you enter in the credentials to the form).
+Once connected, you can receive a message with the LAN IP for your Pi at https://snaptext.live (the specific URL will be given to you when you enter in the credentials to the form).
 
 # How does it work?
 
@@ -48,13 +48,21 @@ $ sudo apt-get install -y dnsmasq hostapd python3-flask python3-requests git
 $ git clone https://github.com/Lucashsmello/orangepi0-turnkey.git
 ```
 
-### Run install script (TODO)
+### Run install script
+Install scripts usage:
+```
+Usage:  ./install.sh
+        ./install.sh SSID PASSWORD
+        ./install.sh --uninstall
+        ./install.sh --help'
+```
 
 To install:
 ```
 $ cd orangepi0-turnkey.git
-$ ./install.sh
+$ ./install.sh SSID PASSWORD
 ```
+Substitutes `SSID` and `PASSWORD` with your desired hotspot SSID and password.
 
 To uninstall:
 ```
@@ -107,25 +115,24 @@ $ sudo systemctl start hostapd && sudo systemctl start dnsmasq
 ```
 
 ### Startup server on boot
-
-Open up the `rc.local`
+Make turnkey a systemd service:
+```
+"[Unit]
+Description=Turnkey Service
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 startup.py
+WorkingDirectory=/PATH/TO/orangepi0-turnkey
+[Install]
+WantedBy=multi-user.target"
+```
+Probably `/PATH/TO` is `/root` or `/home/pi`. You need to substitute properly.
+Enable and Start service
 
 ```
-$ sudo nano /etc/rc.local
-```
-
-And add the following line before `exit 0`:
-
-```
-/usr/bin/sudo /usr/bin/python3 /PATH/TO/raspberry-pi-turnkey/startup.py &
-```
-Probably `/PATH/TO` is `/root` or `/home/pi`
-
-
-### Reboot pi
-
-```
-$ sudo reboot
+systemctl start turnkey
+systemctl enable turnkey
 ```
 
 # License 
