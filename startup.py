@@ -105,11 +105,11 @@ def check_cred(ssid, password):
     stopAP()
     SSID_LIST=[]
     getssid(ntries=5)
-    check_cred_cmd='nmcli device wifi connect %s password %s' % (ssid,password) # if successul, this automatically saves configuration
-    print("running: %s" % check_cred_cmd)
+    check_cred_cmd=['nmcli', 'device', 'wifi', 'connect', ssid, 'password', password] # if successul, this automatically saves configuration
+    print("running: %s" % " ".join(check_cred_cmd))
     for _ in range(5):
         try:
-            P = subprocess.run(check_cred_cmd.split(), check=True)
+            P = subprocess.run(check_cred_cmd, check=True)
             print("Credentials are OK")
             return True
         except subprocess.CalledProcessError as e:
